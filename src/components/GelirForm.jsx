@@ -4,43 +4,63 @@ import { supabase } from "../supabase";
 export default function GelirForm() {
   const bugun = new Date().toISOString().split("T")[0];
 
+  const [isletme, setIsletme] = useState("cafe");
   const [tarih, setTarih] = useState(bugun);
 
   const [nakitSatis, setNakitSatis] = useState("0");
-  const [krediKartiSatis, setKrediKartiSatis] = useState("0");
-  const [bankaHavalesi, setBankaHavalesi] = useState("0");
+  const [krediKartiSatis, setKrediKartiSatis] =
+    useState("0");
+  const [krediKartiSatis2, setKrediKartiSatis2] =
+    useState("0");
+  const [bankaHavalesi, setBankaHavalesi] =
+    useState("0");
 
   const [loading, setLoading] = useState(false);
-  const [veriYukleniyor, setVeriYukleniyor] = useState(false);
+  const [veriYukleniyor, setVeriYukleniyor] =
+    useState(false);
   const [mesaj, setMesaj] = useState("");
   const [hataVar, setHataVar] = useState(false);
   const [kayitMevcut, setKayitMevcut] = useState(false);
 
   useEffect(() => {
     gunlukGeliriGetir();
-  }, [tarih]);
+  }, [tarih, isletme]);
 
   async function gunlukGeliriGetir() {
-    if (!tarih) return;
+    if (!tarih || !isletme) return;
 
     setVeriYukleniyor(true);
     setMesaj("");
     setHataVar(false);
 
+    setNakitSatis("0");
+    setKrediKartiSatis("0");
+    setKrediKartiSatis2("0");
+    setBankaHavalesi("0");
+    setKayitMevcut(false);
+
+    const gelirTurleri =
+      isletme === "cafe"
+        ? [
+            "nakit_satis",
+            "kredi_karti_satis",
+            "banka_havalesi",
+          ]
+        : ["nakit_satis", "kredi_karti_satis"];
+
     const { data, error } = await supabase
       .from("gelirler")
-      .select("tur, tutar")
+      .select("tur, tutar, kart_1_tutar, kart_2_tutar")
       .eq("tarih", tarih)
-      .in("tur", [
-        "nakit_satis",
-        "kredi_karti_satis",
-        "banka_havalesi",
-      ]);
+      .eq("isletme", isletme)
+      .in("tur", gelirTurleri);
 
     setVeriYukleniyor(false);
 
     if (error) {
-      setMesaj(`Gelir bilgileri alınamadı: ${error.message}`);
+      setMesaj(
+        `Gelir bilgileri alınamadı: ${error.message}`
+      );
       setHataVar(true);
       return;
     }
@@ -60,33 +80,87 @@ export default function GelirForm() {
     );
 
     setNakitSatis(
-  nakitKaydi ? String(nakitKaydi.tutar) : "0"
-);
+      nakitKaydi ? String(nakitKaydi.tutar) : "0"
+    );
 
-setKrediKartiSatis(
-  krediKartiKaydi ? String(krediKartiKaydi.tutar) : "0"
-);
+    if (krediKartiKaydi) {
+  const kart1 = Number(
+    krediKartiKaydi.kart_1_tutar || 0
+  );
 
-setBankaHavalesi(
-  bankaKaydi ? String(bankaKaydi.tutar) : "0"
-);
+  const kart2 = Number(
+    krediKartiKaydi.kart_2_tutar || 0
+  );
+
+  const toplam = Number(
+    krediKartiKaydi.tutar || 0
+  );
+
+  /*
+    Eski kayıtlarda kart_1_tutar ve kart_2_tutar
+    bulunmadığı için toplam tutarı ilk alanda gösterir.
+  */
+  if (
+    isletme === "bufe" &&
+    kart1 === 0 &&
+    kart2 === 0 &&
+    toplam !== 0
+  ) {
+    setKrediKartiSatis(String(toplam));
+    setKrediKartiSatis2("0");
+  } else {
+    setKrediKartiSatis(String(kart1));
+    setKrediKartiSatis2(String(kart2));
+  }
+} else {
+  setKrediKartiSatis("0");
+  setKrediKartiSatis2("0");
+}
+
+    setBankaHavalesi(
+      bankaKaydi ? String(bankaKaydi.tutar) : "0"
+    );
 
     setKayitMevcut(kayitlar.length > 0);
   }
 
-function tutariSayiyaCevir(deger) {
-  const sayi = Number(deger || 0);
+  function tutariSayiyaCevir(deger) {
+    const sayi = Number(deger || 0);
 
-  return Number.isFinite(sayi) ? sayi : 0;
-}
+    return Number.isFinite(sayi) ? sayi : 0;
+  }
+
+  const krediKartiToplam = useMemo(() => {
+    if (isletme === "bufe") {
+      return (
+        tutariSayiyaCevir(krediKartiSatis) +
+        tutariSayiyaCevir(krediKartiSatis2)
+      );
+    }
+
+    return tutariSayiyaCevir(krediKartiSatis);
+  }, [
+    isletme,
+    krediKartiSatis,
+    krediKartiSatis2,
+  ]);
 
   const gunlukToplam = useMemo(() => {
-    return (
-      tutariSayiyaCevir(nakitSatis) +
-      tutariSayiyaCevir(krediKartiSatis) +
-      tutariSayiyaCevir(bankaHavalesi)
-    );
-  }, [nakitSatis, krediKartiSatis, bankaHavalesi]);
+    const nakitTutar =
+      tutariSayiyaCevir(nakitSatis);
+
+    const bankaTutar =
+      isletme === "cafe"
+        ? tutariSayiyaCevir(bankaHavalesi)
+        : 0;
+
+    return nakitTutar + krediKartiToplam + bankaTutar;
+  }, [
+    isletme,
+    nakitSatis,
+    krediKartiToplam,
+    bankaHavalesi,
+  ]);
 
   function paraFormatla(tutar) {
     return Number(tutar || 0).toLocaleString("tr-TR", {
@@ -95,8 +169,8 @@ function tutariSayiyaCevir(deger) {
     });
   }
 
-  async function kaydet(e) {
-    e.preventDefault();
+  async function kaydet(event) {
+    event.preventDefault();
 
     setMesaj("");
     setHataVar(false);
@@ -107,21 +181,35 @@ function tutariSayiyaCevir(deger) {
       return;
     }
 
-    const nakitTutar = tutariSayiyaCevir(nakitSatis);
-    const krediKartiTutar = tutariSayiyaCevir(krediKartiSatis);
-    const bankaTutar = tutariSayiyaCevir(bankaHavalesi);
+    const nakitTutar =
+      tutariSayiyaCevir(nakitSatis);
+
+    const krediKartiTutar1 =
+      tutariSayiyaCevir(krediKartiSatis);
+
+    const krediKartiTutar2 =
+      isletme === "bufe"
+        ? tutariSayiyaCevir(krediKartiSatis2)
+        : 0;
+
+    const krediKartiTutar =
+      krediKartiTutar1 + krediKartiTutar2;
+
+    const bankaTutar =
+      isletme === "cafe"
+        ? tutariSayiyaCevir(bankaHavalesi)
+        : 0;
 
     if (
       nakitTutar < 0 ||
-      krediKartiTutar < 0 ||
+      krediKartiTutar1 < 0 ||
+      krediKartiTutar2 < 0 ||
       bankaTutar < 0
     ) {
       setMesaj("Gelir tutarları negatif olamaz.");
       setHataVar(true);
       return;
     }
-
-
 
     setLoading(true);
 
@@ -140,48 +228,106 @@ function tutariSayiyaCevir(deger) {
     const kayitlar = [
       {
         tarih,
+        isletme,
         tur: "nakit_satis",
         tutar: nakitTutar,
-        aciklama: "Gün sonu nakit satışı",
+        aciklama:
+          isletme === "cafe"
+            ? "Cafe gün sonu nakit satışı"
+            : "Büfe gün sonu nakit satışı",
         created_by: user.id,
       },
       {
-        tarih,
-        tur: "kredi_karti_satis",
-        tutar: krediKartiTutar,
-        aciklama: "Gün sonu kredi kartı satışı",
-        created_by: user.id,
-      },
-      {
-        tarih,
-        tur: "banka_havalesi",
-        tutar: bankaTutar,
-        aciklama: "Gün sonu banka havalesi",
-        created_by: user.id,
-      },
+  tarih,
+  isletme,
+  tur: "kredi_karti_satis",
+  tutar: krediKartiTutar,
+  kart_1_tutar: krediKartiTutar1,
+  kart_2_tutar: krediKartiTutar2,
+  aciklama:
+    isletme === "cafe"
+      ? "Cafe gün sonu kredi kartı satışı"
+      : "Büfe gün sonu kredi kartı satışları",
+  created_by: user.id,
+},
     ];
 
-    const { error } = await supabase
+    if (isletme === "cafe") {
+      kayitlar.push({
+        tarih,
+        isletme,
+        tur: "banka_havalesi",
+        tutar: bankaTutar,
+        aciklama: "Cafe gün sonu banka havalesi",
+        created_by: user.id,
+      });
+    }
+
+    const { error: kayitHatasi } = await supabase
       .from("gelirler")
       .upsert(kayitlar, {
-        onConflict: "tarih,tur",
+        onConflict: "tarih,tur,isletme",
       });
 
-    setLoading(false);
-
-    if (error) {
-      setMesaj(`Kayıt hatası: ${error.message}`);
+    if (kayitHatasi) {
+      setLoading(false);
+      setMesaj(`Kayıt hatası: ${kayitHatasi.message}`);
       setHataVar(true);
       return;
     }
 
+    /*
+      Büfe kaydında banka havalesi bulunmamalı.
+      Önceden yanlışlıkla oluşmuş bir kayıt varsa temizler.
+    */
+    if (isletme === "bufe") {
+      const { error: bankaSilmeHatasi } = await supabase
+        .from("gelirler")
+        .delete()
+        .eq("tarih", tarih)
+        .eq("isletme", "bufe")
+        .eq("tur", "banka_havalesi");
+
+      if (bankaSilmeHatasi) {
+        setLoading(false);
+        setMesaj(
+          `Büfe banka kaydı temizlenemedi: ${bankaSilmeHatasi.message}`
+        );
+        setHataVar(true);
+        return;
+      }
+    }
+
+    setLoading(false);
     setKayitMevcut(true);
+
     setMesaj(
       kayitMevcut
-        ? "Gün sonu gelirleri güncellendi."
-        : "Gün sonu gelirleri kaydedildi."
+        ? `${
+            isletme === "cafe" ? "Cafe" : "Büfe"
+          } gün sonu gelirleri güncellendi.`
+        : `${
+            isletme === "cafe" ? "Cafe" : "Büfe"
+          } gün sonu gelirleri kaydedildi.`
     );
+
     setHataVar(false);
+
+    /*
+      Büfe kayıtlarından sonra iki kutunun toplamı
+      tek kayıt olarak tutulduğu için tekrar yüklenir.
+    */
+    await gunlukGeliriGetir();
+
+    setMesaj(
+      kayitMevcut
+        ? `${
+            isletme === "cafe" ? "Cafe" : "Büfe"
+          } gün sonu gelirleri güncellendi.`
+        : `${
+            isletme === "cafe" ? "Cafe" : "Büfe"
+          } gün sonu gelirleri kaydedildi.`
+    );
   }
 
   return (
@@ -194,7 +340,9 @@ function tutariSayiyaCevir(deger) {
         borderRadius: 10,
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Gün Sonu Gelir Girişi</h2>
+      <h2 style={{ marginTop: 0 }}>
+        Gün Sonu Gelir Girişi
+      </h2>
 
       {mesaj && (
         <p
@@ -210,7 +358,32 @@ function tutariSayiyaCevir(deger) {
 
       <form onSubmit={kaydet}>
         <div style={alanStili}>
-          <label htmlFor="gelir-tarih" style={etiketStili}>
+          <label
+            htmlFor="gelir-isletme"
+            style={etiketStili}
+          >
+            İşletme
+          </label>
+
+          <select
+            id="gelir-isletme"
+            value={isletme}
+            onChange={(event) =>
+              setIsletme(event.target.value)
+            }
+            disabled={loading}
+            style={inputStili}
+          >
+            <option value="cafe">Cafe</option>
+            <option value="bufe">Büfe</option>
+          </select>
+        </div>
+
+        <div style={alanStili}>
+          <label
+            htmlFor="gelir-tarih"
+            style={etiketStili}
+          >
             Tarih
           </label>
 
@@ -218,8 +391,11 @@ function tutariSayiyaCevir(deger) {
             id="gelir-tarih"
             type="date"
             value={tarih}
-            onChange={(e) => setTarih(e.target.value)}
+            onChange={(event) =>
+              setTarih(event.target.value)
+            }
             required
+            disabled={loading}
             style={inputStili}
           />
         </div>
@@ -237,13 +413,16 @@ function tutariSayiyaCevir(deger) {
                   color: "#1d4ed8",
                 }}
               >
-                Bu tarihe ait kayıt mevcut. Kaydettiğinizde kayıtlar
-                güncellenecek.
+                Bu tarih ve işletmeye ait kayıt mevcut.
+                Kaydettiğinizde kayıtlar güncellenecek.
               </p>
             )}
 
             <div style={alanStili}>
-              <label htmlFor="nakit-satis" style={etiketStili}>
+              <label
+                htmlFor="nakit-satis"
+                style={etiketStili}
+              >
                 Nakit Satış
               </label>
 
@@ -255,15 +434,22 @@ function tutariSayiyaCevir(deger) {
                 inputMode="decimal"
                 placeholder="0,00"
                 value={nakitSatis}
-                onChange={(e) => setNakitSatis(e.target.value)}
+                onChange={(event) =>
+                  setNakitSatis(event.target.value)
+                }
                 required
                 style={inputStili}
               />
             </div>
 
             <div style={alanStili}>
-              <label htmlFor="kredi-karti-satis" style={etiketStili}>
-                Kredi Kartı Satışı
+              <label
+                htmlFor="kredi-karti-satis"
+                style={etiketStili}
+              >
+                {isletme === "bufe"
+                  ? "Kredi Kartı Satışı 1"
+                  : "Kredi Kartı Satışı"}
               </label>
 
               <input
@@ -274,30 +460,84 @@ function tutariSayiyaCevir(deger) {
                 inputMode="decimal"
                 placeholder="0,00"
                 value={krediKartiSatis}
-                onChange={(e) => setKrediKartiSatis(e.target.value)}
+                onChange={(event) =>
+                  setKrediKartiSatis(event.target.value)
+                }
                 required
                 style={inputStili}
               />
             </div>
 
-            <div style={alanStili}>
-              <label htmlFor="banka-havalesi" style={etiketStili}>
-                Banka Havalesi
-              </label>
+            {isletme === "bufe" && (
+              <div style={alanStili}>
+                <label
+                  htmlFor="kredi-karti-satis-2"
+                  style={etiketStili}
+                >
+                  Kredi Kartı Satışı 2
+                </label>
 
-              <input
-                id="banka-havalesi"
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={bankaHavalesi}
-                onChange={(e) => setBankaHavalesi(e.target.value)}
-                required
-                style={inputStili}
-              />
-            </div>
+                <input
+                  id="kredi-karti-satis-2"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={krediKartiSatis2}
+                  onChange={(event) =>
+                    setKrediKartiSatis2(
+                      event.target.value
+                    )
+                  }
+                  required
+                  style={inputStili}
+                />
+              </div>
+            )}
+
+            {isletme === "bufe" && (
+              <div
+                style={{
+                  marginBottom: 15,
+                  padding: 10,
+                  background: "#f8fafc",
+                  borderRadius: 6,
+                  fontWeight: 600,
+                }}
+              >
+                Kredi Kartı Toplamı:{" "}
+                {paraFormatla(krediKartiToplam)}
+              </div>
+            )}
+
+            {isletme === "cafe" && (
+              <div style={alanStili}>
+                <label
+                  htmlFor="banka-havalesi"
+                  style={etiketStili}
+                >
+                  Banka Havalesi
+                </label>
+
+                <input
+                  id="banka-havalesi"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={bankaHavalesi}
+                  onChange={(event) =>
+                    setBankaHavalesi(
+                      event.target.value
+                    )
+                  }
+                  required
+                  style={inputStili}
+                />
+              </div>
+            )}
 
             <div
               style={{
@@ -309,7 +549,9 @@ function tutariSayiyaCevir(deger) {
                 fontWeight: 700,
               }}
             >
-              Günlük Toplam: {paraFormatla(gunlukToplam)}
+              {isletme === "cafe" ? "Cafe" : "Büfe"}{" "}
+              Günlük Toplamı:{" "}
+              {paraFormatla(gunlukToplam)}
             </div>
 
             <button
@@ -318,11 +560,15 @@ function tutariSayiyaCevir(deger) {
               style={{
                 width: "100%",
                 padding: 12,
-                background: loading ? "#94a3b8" : "#2563eb",
+                background: loading
+                  ? "#94a3b8"
+                  : "#2563eb",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: 6,
-                cursor: loading ? "not-allowed" : "pointer",
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
                 fontSize: 16,
               }}
             >
