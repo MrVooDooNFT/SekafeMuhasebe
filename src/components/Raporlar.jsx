@@ -3,20 +3,32 @@ import { supabase } from "../supabase";
 
 export default function Raporlar() {
   const bugun = tarihYaz(new Date());
+
   const buAyinIlkGunu = tarihYaz(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      1
+    )
   );
+
+  const [secilenIsletme, setSecilenIsletme] =
+    useState("tumu");
 
   const [baslangicTarihi, setBaslangicTarihi] =
     useState(buAyinIlkGunu);
-  const [bitisTarihi, setBitisTarihi] = useState(bugun);
+
+  const [bitisTarihi, setBitisTarihi] =
+    useState(bugun);
 
   const [gelirler, setGelirler] = useState([]);
   const [giderler, setGiderler] = useState([]);
   const [odemeler, setOdemeler] = useState([]);
   const [cariler, setCariler] = useState([]);
 
-  const [yukleniyor, setYukleniyor] = useState(true);
+  const [yukleniyor, setYukleniyor] =
+    useState(true);
+
   const [mesaj, setMesaj] = useState("");
 
   useEffect(() => {
@@ -35,24 +47,48 @@ export default function Raporlar() {
     ] = await Promise.all([
       supabase
         .from("gelirler")
-        .select("id, tarih, tur, tutar"),
+        .select(`
+          id,
+          tarih,
+          isletme,
+          tur,
+          tutar,
+          kart_1_tutar,
+          kart_2_tutar
+        `),
 
       supabase
         .from("giderler")
-        .select(
-          "id, tarih, tur, cari_id, toplam_tutar, aciklama, aktif"
-        )
+        .select(`
+          id,
+          tarih,
+          tur,
+          cari_id,
+          toplam_tutar,
+          aciklama,
+          aktif
+        `)
         .eq("aktif", true),
 
       supabase
         .from("gider_odemeleri")
-        .select(
-          "id, tarih, cari_id, tutar, odeme_yolu, aciklama"
-        ),
+        .select(`
+          id,
+          tarih,
+          cari_id,
+          tutar,
+          odeme_yolu,
+          aciklama
+        `),
 
       supabase
         .from("cariler")
-        .select("id, cari_adi, telefon, aktif"),
+        .select(`
+          id,
+          cari_adi,
+          telefon,
+          aktif
+        `),
     ]);
 
     if (gelirSonucu.error) {
@@ -91,17 +127,26 @@ export default function Raporlar() {
     setGiderler(giderSonucu.data || []);
     setOdemeler(odemeSonucu.data || []);
     setCariler(cariSonucu.data || []);
+
     setYukleniyor(false);
   }
 
   function tarihAraligindaMi(tarih) {
-    if (!tarih) return false;
-
-    if (baslangicTarihi && tarih < baslangicTarihi) {
+    if (!tarih) {
       return false;
     }
 
-    if (bitisTarihi && tarih > bitisTarihi) {
+    if (
+      baslangicTarihi &&
+      tarih < baslangicTarihi
+    ) {
+      return false;
+    }
+
+    if (
+      bitisTarihi &&
+      tarih > bitisTarihi
+    ) {
       return false;
     }
 
@@ -109,22 +154,66 @@ export default function Raporlar() {
   }
 
   const filtreliGelirler = useMemo(() => {
-    return gelirler.filter((gelir) =>
-      tarihAraligindaMi(gelir.tarih)
-    );
-  }, [gelirler, baslangicTarihi, bitisTarihi]);
+    return gelirler.filter((gelir) => {
+      const tarihUygun =
+        tarihAraligindaMi(gelir.tarih);
 
+      const isletmeUygun =
+        secilenIsletme === "tumu" ||
+        gelir.isletme === secilenIsletme;
+
+      return tarihUygun && isletmeUygun;
+    });
+  }, [
+    gelirler,
+    secilenIsletme,
+    baslangicTarihi,
+    bitisTarihi,
+  ]);
+
+  /*
+    Bütün giderler Cafe'ye aittir.
+
+    Büfe seçildiğinde gider bulunmaz.
+    Tümü veya Cafe seçildiğinde tarih filtresine
+    uygun bütün giderler kullanılır.
+  */
   const filtreliGiderler = useMemo(() => {
+    if (secilenIsletme === "bufe") {
+      return [];
+    }
+
     return giderler.filter((gider) =>
       tarihAraligindaMi(gider.tarih)
     );
-  }, [giderler, baslangicTarihi, bitisTarihi]);
+  }, [
+    giderler,
+    secilenIsletme,
+    baslangicTarihi,
+    bitisTarihi,
+  ]);
 
+  /*
+    Bütün ödemeler Cafe'ye aittir.
+
+    Büfe seçildiğinde ödeme bulunmaz.
+    Tümü veya Cafe seçildiğinde tarih filtresine
+    uygun bütün ödemeler kullanılır.
+  */
   const filtreliOdemeler = useMemo(() => {
+    if (secilenIsletme === "bufe") {
+      return [];
+    }
+
     return odemeler.filter((odeme) =>
       tarihAraligindaMi(odeme.tarih)
     );
-  }, [odemeler, baslangicTarihi, bitisTarihi]);
+  }, [
+    odemeler,
+    secilenIsletme,
+    baslangicTarihi,
+    bitisTarihi,
+  ]);
 
   const gelirDagilimi = useMemo(() => {
     const sonuc = {
@@ -150,7 +239,9 @@ export default function Raporlar() {
     const sonuc = {};
 
     for (const gider of filtreliGiderler) {
-      const tutar = Number(gider.toplam_tutar || 0);
+      const tutar = Number(
+        gider.toplam_tutar || 0
+      );
 
       sonuc[gider.tur] =
         (sonuc[gider.tur] || 0) + tutar;
@@ -175,7 +266,8 @@ export default function Raporlar() {
   const toplamGider = useMemo(() => {
     return filtreliGiderler.reduce(
       (toplam, gider) =>
-        toplam + Number(gider.toplam_tutar || 0),
+        toplam +
+        Number(gider.toplam_tutar || 0),
       0
     );
   }, [filtreliGiderler]);
@@ -188,10 +280,32 @@ export default function Raporlar() {
     );
   }, [filtreliOdemeler]);
 
-  const karZarar = toplamGelir - toplamGider;
-  const kasaNetHareketi = toplamGelir - toplamOdeme;
+  /*
+    Kâr / zarar hesabında gider kullanılır.
 
+    Yapılan ödeme ayrıca gider değildir.
+    Aynı tutarı ikinci kez düşmemek gerekir.
+  */
+  const karZarar =
+    toplamGelir - toplamGider;
+
+  /*
+    Kasa net hareketinde yapılan ödeme kullanılır.
+  */
+  const kasaNetHareketi =
+    toplamGelir - toplamOdeme;
+
+  /*
+    Cari borçları tüm zamanlar üzerinden hesaplanır.
+
+    Bu alan yalnızca Tümü ve Cafe seçiminde
+    gösterilir. Büfede cari ve borç yoktur.
+  */
   const cariBakiyeleri = useMemo(() => {
+    if (secilenIsletme === "bufe") {
+      return [];
+    }
+
     const cariHaritasi = {};
 
     for (const cari of cariler) {
@@ -207,49 +321,70 @@ export default function Raporlar() {
     }
 
     for (const gider of giderler) {
-      if (!gider.cari_id) continue;
+      if (!gider.cari_id) {
+        continue;
+      }
 
       if (!cariHaritasi[gider.cari_id]) {
         continue;
       }
 
-      cariHaritasi[gider.cari_id].toplamGider +=
-        Number(gider.toplam_tutar || 0);
+      cariHaritasi[
+        gider.cari_id
+      ].toplamGider += Number(
+        gider.toplam_tutar || 0
+      );
     }
 
     for (const odeme of odemeler) {
-      if (!odeme.cari_id) continue;
+      if (!odeme.cari_id) {
+        continue;
+      }
 
       if (!cariHaritasi[odeme.cari_id]) {
         continue;
       }
 
-      cariHaritasi[odeme.cari_id].toplamOdeme +=
-        Number(odeme.tutar || 0);
+      cariHaritasi[
+        odeme.cari_id
+      ].toplamOdeme += Number(
+        odeme.tutar || 0
+      );
     }
 
     return Object.values(cariHaritasi)
       .map((cari) => ({
         ...cari,
         kalanBakiye:
-          cari.toplamGider - cari.toplamOdeme,
+          cari.toplamGider -
+          cari.toplamOdeme,
       }))
       .filter(
-        (cari) => Math.abs(cari.kalanBakiye) >= 0.01
+        (cari) =>
+          Math.abs(cari.kalanBakiye) >= 0.01
       )
       .sort(
-        (a, b) => b.kalanBakiye - a.kalanBakiye
+        (a, b) =>
+          b.kalanBakiye - a.kalanBakiye
       );
-  }, [cariler, giderler, odemeler]);
+  }, [
+    cariler,
+    giderler,
+    odemeler,
+    secilenIsletme,
+  ]);
 
   const toplamCariBorcu = useMemo(() => {
-    return cariBakiyeleri.reduce((toplam, cari) => {
-      if (cari.kalanBakiye <= 0) {
-        return toplam;
-      }
+    return cariBakiyeleri.reduce(
+      (toplam, cari) => {
+        if (cari.kalanBakiye <= 0) {
+          return toplam;
+        }
 
-      return toplam + cari.kalanBakiye;
-    }, 0);
+        return toplam + cari.kalanBakiye;
+      },
+      0
+    );
   }, [cariBakiyeleri]);
 
   const gunlukOzet = useMemo(() => {
@@ -281,11 +416,15 @@ export default function Raporlar() {
         gun.nakit += tutar;
       }
 
-      if (gelir.tur === "kredi_karti_satis") {
+      if (
+        gelir.tur === "kredi_karti_satis"
+      ) {
         gun.krediKarti += tutar;
       }
 
-      if (gelir.tur === "banka_havalesi") {
+      if (
+        gelir.tur === "banka_havalesi"
+      ) {
         gun.bankaHavalesi += tutar;
       }
 
@@ -303,16 +442,22 @@ export default function Raporlar() {
     for (const odeme of filtreliOdemeler) {
       const gun = gunOlustur(odeme.tarih);
 
-      gun.toplamOdeme += Number(odeme.tutar || 0);
+      gun.toplamOdeme += Number(
+        odeme.tutar || 0
+      );
     }
 
     return Object.values(gunler)
       .map((gun) => ({
         ...gun,
+
         karZarar:
-          gun.toplamGelir - gun.toplamGider,
+          gun.toplamGelir -
+          gun.toplamGider,
+
         kasaNet:
-          gun.toplamGelir - gun.toplamOdeme,
+          gun.toplamGelir -
+          gun.toplamOdeme,
       }))
       .sort((a, b) =>
         b.tarih.localeCompare(a.tarih)
@@ -336,11 +481,15 @@ export default function Raporlar() {
       gun === 0 ? -6 : 1 - gun;
 
     const pazartesi = new Date(simdi);
+
     pazartesi.setDate(
       simdi.getDate() + pazartesiFarki
     );
 
-    setBaslangicTarihi(tarihYaz(pazartesi));
+    setBaslangicTarihi(
+      tarihYaz(pazartesi)
+    );
+
     setBitisTarihi(bugun);
   }
 
@@ -375,8 +524,13 @@ export default function Raporlar() {
       0
     );
 
-    setBaslangicTarihi(tarihYaz(ilkGun));
-    setBitisTarihi(tarihYaz(sonGun));
+    setBaslangicTarihi(
+      tarihYaz(ilkGun)
+    );
+
+    setBitisTarihi(
+      tarihYaz(sonGun)
+    );
   }
 
   function buYiliSec() {
@@ -384,7 +538,11 @@ export default function Raporlar() {
 
     setBaslangicTarihi(
       tarihYaz(
-        new Date(simdi.getFullYear(), 0, 1)
+        new Date(
+          simdi.getFullYear(),
+          0,
+          1
+        )
       )
     );
 
@@ -397,17 +555,18 @@ export default function Raporlar() {
   }
 
   function paraFormatla(tutar) {
-    return Number(tutar || 0).toLocaleString(
-      "tr-TR",
-      {
-        style: "currency",
-        currency: "TRY",
-      }
-    );
+    return Number(
+      tutar || 0
+    ).toLocaleString("tr-TR", {
+      style: "currency",
+      currency: "TRY",
+    });
   }
 
   function yuzdeHesapla(tutar, toplam) {
-    if (!toplam) return "%0";
+    if (!toplam) {
+      return "%0";
+    }
 
     return `%${(
       (Number(tutar || 0) / toplam) *
@@ -415,6 +574,18 @@ export default function Raporlar() {
     ).toLocaleString("tr-TR", {
       maximumFractionDigits: 1,
     })}`;
+  }
+
+  function secilenIsletmeYaz() {
+    if (secilenIsletme === "cafe") {
+      return "Cafe";
+    }
+
+    if (secilenIsletme === "bufe") {
+      return "Büfe";
+    }
+
+    return "Tüm İşletmeler";
   }
 
   return (
@@ -435,6 +606,38 @@ export default function Raporlar() {
       <div style={filtreKutusuStili}>
         <div>
           <label
+            htmlFor="rapor-isletme"
+            style={etiketStili}
+          >
+            İşletme
+          </label>
+
+          <select
+            id="rapor-isletme"
+            value={secilenIsletme}
+            onChange={(event) =>
+              setSecilenIsletme(
+                event.target.value
+              )
+            }
+            style={inputStili}
+          >
+            <option value="tumu">
+              Tümü
+            </option>
+
+            <option value="cafe">
+              Cafe
+            </option>
+
+            <option value="bufe">
+              Büfe
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label
             htmlFor="rapor-baslangic"
             style={etiketStili}
           >
@@ -446,7 +649,9 @@ export default function Raporlar() {
             type="date"
             value={baslangicTarihi}
             onChange={(event) =>
-              setBaslangicTarihi(event.target.value)
+              setBaslangicTarihi(
+                event.target.value
+              )
             }
             style={inputStili}
           />
@@ -465,13 +670,18 @@ export default function Raporlar() {
             type="date"
             value={bitisTarihi}
             onChange={(event) =>
-              setBitisTarihi(event.target.value)
+              setBitisTarihi(
+                event.target.value
+              )
             }
             style={inputStili}
           />
         </div>
 
-        <button type="button" onClick={bugunuSec}>
+        <button
+          type="button"
+          onClick={bugunuSec}
+        >
           Bugün
         </button>
 
@@ -482,7 +692,10 @@ export default function Raporlar() {
           Bu Hafta
         </button>
 
-        <button type="button" onClick={buAyiSec}>
+        <button
+          type="button"
+          onClick={buAyiSec}
+        >
           Bu Ay
         </button>
 
@@ -508,6 +721,19 @@ export default function Raporlar() {
         </button>
       </div>
 
+      <div
+        style={{
+          marginBottom: 20,
+          color: "#6b7280",
+          fontSize: 14,
+        }}
+      >
+        Gösterilen rapor:{" "}
+        <strong>
+          {secilenIsletmeYaz()}
+        </strong>
+      </div>
+
       {yukleniyor ? (
         <p>Rapor hazırlanıyor...</p>
       ) : (
@@ -515,22 +741,34 @@ export default function Raporlar() {
           <div style={kartAlaniStili}>
             <OzetKarti
               baslik="Toplam Gelir"
-              tutar={paraFormatla(toplamGelir)}
+              tutar={paraFormatla(
+                toplamGelir
+              )}
             />
 
-            <OzetKarti
-              baslik="Toplam Gider"
-              tutar={paraFormatla(toplamGider)}
-            />
+            {secilenIsletme !== "bufe" && (
+              <OzetKarti
+                baslik="Toplam Gider"
+                tutar={paraFormatla(
+                  toplamGider
+                )}
+              />
+            )}
 
-            <OzetKarti
-              baslik="Yapılan Ödeme"
-              tutar={paraFormatla(toplamOdeme)}
-            />
+            {secilenIsletme !== "bufe" && (
+              <OzetKarti
+                baslik="Yapılan Ödeme"
+                tutar={paraFormatla(
+                  toplamOdeme
+                )}
+              />
+            )}
 
             <OzetKarti
               baslik="Kâr / Zarar"
-              tutar={paraFormatla(karZarar)}
+              tutar={paraFormatla(
+                karZarar
+              )}
               durum={
                 karZarar > 0
                   ? "pozitif"
@@ -542,7 +780,9 @@ export default function Raporlar() {
 
             <OzetKarti
               baslik="Kasa Net Hareketi"
-              tutar={paraFormatla(kasaNetHareketi)}
+              tutar={paraFormatla(
+                kasaNetHareketi
+              )}
               durum={
                 kasaNetHareketi > 0
                   ? "pozitif"
@@ -552,18 +792,30 @@ export default function Raporlar() {
               }
             />
 
-            <OzetKarti
-              baslik="Güncel Cari Borcu"
-              tutar={paraFormatla(toplamCariBorcu)}
-              altYazi="Tüm zamanlar"
-            />
+            {secilenIsletme !== "bufe" && (
+              <OzetKarti
+                baslik="Güncel Cari Borcu"
+                tutar={paraFormatla(
+                  toplamCariBorcu
+                )}
+                altYazi="Tüm zamanlar"
+              />
+            )}
           </div>
 
-          <div style={ikiKolonStili}>
+          <div
+            style={
+              secilenIsletme === "bufe"
+                ? tekKolonStili
+                : ikiKolonStili
+            }
+          >
             <RaporKutusu baslik="Gelir Dağılımı">
               <DagilimSatiri
                 baslik="Nakit Satış"
-                tutar={gelirDagilimi.nakit_satis}
+                tutar={
+                  gelirDagilimi.nakit_satis
+                }
                 toplam={toplamGelir}
                 paraFormatla={paraFormatla}
                 yuzdeHesapla={yuzdeHesapla}
@@ -572,156 +824,264 @@ export default function Raporlar() {
               <DagilimSatiri
                 baslik="Kredi Kartı Satışı"
                 tutar={
-                  gelirDagilimi.kredi_karti_satis
+                  gelirDagilimi
+                    .kredi_karti_satis
                 }
                 toplam={toplamGelir}
                 paraFormatla={paraFormatla}
                 yuzdeHesapla={yuzdeHesapla}
               />
 
-              <DagilimSatiri
-                baslik="Banka Havalesi"
-                tutar={
-                  gelirDagilimi.banka_havalesi
-                }
-                toplam={toplamGelir}
-                paraFormatla={paraFormatla}
-                yuzdeHesapla={yuzdeHesapla}
-              />
-
-              <div style={toplamSatiriStili}>
-                <strong>Toplam</strong>
-                <strong>
-                  {paraFormatla(toplamGelir)}
-                </strong>
-                <strong>%100</strong>
-              </div>
-            </RaporKutusu>
-
-            <RaporKutusu baslik="Gider Dağılımı">
-              {giderDagilimi.length === 0 ? (
-                <p>Seçilen dönemde gider bulunamadı.</p>
-              ) : (
-                giderDagilimi.map((gider) => (
-                  <DagilimSatiri
-                    key={gider.tur}
-                    baslik={giderTuruYaz(gider.tur)}
-                    tutar={gider.tutar}
-                    toplam={toplamGider}
-                    paraFormatla={paraFormatla}
-                    yuzdeHesapla={yuzdeHesapla}
-                  />
-                ))
+              {secilenIsletme !== "bufe" && (
+                <DagilimSatiri
+                  baslik="Banka Havalesi"
+                  tutar={
+                    gelirDagilimi
+                      .banka_havalesi
+                  }
+                  toplam={toplamGelir}
+                  paraFormatla={
+                    paraFormatla
+                  }
+                  yuzdeHesapla={
+                    yuzdeHesapla
+                  }
+                />
               )}
 
               <div style={toplamSatiriStili}>
                 <strong>Toplam</strong>
+
                 <strong>
-                  {paraFormatla(toplamGider)}
+                  {paraFormatla(
+                    toplamGelir
+                  )}
                 </strong>
+
                 <strong>
-                  {toplamGider > 0 ? "%100" : "%0"}
+                  {toplamGelir > 0
+                    ? "%100"
+                    : "%0"}
                 </strong>
               </div>
             </RaporKutusu>
+
+            {secilenIsletme !== "bufe" && (
+              <RaporKutusu baslik="Gider Dağılımı">
+                {giderDagilimi.length ===
+                0 ? (
+                  <p>
+                    Seçilen dönemde gider
+                    bulunamadı.
+                  </p>
+                ) : (
+                  giderDagilimi.map(
+                    (gider) => (
+                      <DagilimSatiri
+                        key={gider.tur}
+                        baslik={giderTuruYaz(
+                          gider.tur
+                        )}
+                        tutar={gider.tutar}
+                        toplam={toplamGider}
+                        paraFormatla={
+                          paraFormatla
+                        }
+                        yuzdeHesapla={
+                          yuzdeHesapla
+                        }
+                      />
+                    )
+                  )
+                )}
+
+                <div
+                  style={toplamSatiriStili}
+                >
+                  <strong>Toplam</strong>
+
+                  <strong>
+                    {paraFormatla(
+                      toplamGider
+                    )}
+                  </strong>
+
+                  <strong>
+                    {toplamGider > 0
+                      ? "%100"
+                      : "%0"}
+                  </strong>
+                </div>
+              </RaporKutusu>
+            )}
           </div>
 
-          <RaporKutusu baslik="Borçlu Cariler">
-            <div style={{ overflowX: "auto" }}>
-              <table style={tabloStili}>
-                <thead>
-                  <tr>
-                    <th style={hucreStili}>Cari</th>
-                    <th style={hucreStili}>
-                      Toplam Gider
-                    </th>
-                    <th style={hucreStili}>
-                      Toplam Ödeme
-                    </th>
-                    <th style={hucreStili}>
-                      Kalan Bakiye
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {cariBakiyeleri.length === 0 ? (
+          {secilenIsletme !== "bufe" && (
+            <RaporKutusu baslik="Borçlu Cariler">
+              <div
+                style={{
+                  overflowX: "auto",
+                }}
+              >
+                <table style={tabloStili}>
+                  <thead>
                     <tr>
-                      <td
-                        style={hucreStili}
-                        colSpan="4"
-                      >
-                        Borç bakiyesi bulunan cari yok.
-                      </td>
+                      <th style={hucreStili}>
+                        Cari
+                      </th>
+
+                      <th style={hucreStili}>
+                        Toplam Gider
+                      </th>
+
+                      <th style={hucreStili}>
+                        Toplam Ödeme
+                      </th>
+
+                      <th style={hucreStili}>
+                        Kalan Bakiye
+                      </th>
                     </tr>
-                  ) : (
-                    cariBakiyeleri.map((cari) => (
-                      <tr key={cari.id}>
-                        <td style={hucreStili}>
-                          {cari.cari_adi}
-                        </td>
+                  </thead>
 
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            cari.toplamGider
-                          )}
-                        </td>
-
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            cari.toplamOdeme
-                          )}
-                        </td>
-
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            cari.kalanBakiye
-                          )}
+                  <tbody>
+                    {cariBakiyeleri.length ===
+                    0 ? (
+                      <tr>
+                        <td
+                          style={hucreStili}
+                          colSpan="4"
+                        >
+                          Borç bakiyesi bulunan
+                          cari yok.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
+                    ) : (
+                      cariBakiyeleri.map(
+                        (cari) => (
+                          <tr key={cari.id}>
+                            <td
+                              style={
+                                hucreStili
+                              }
+                            >
+                              {
+                                cari.cari_adi
+                              }
+                            </td>
 
-                <tfoot>
-                  <tr>
-                    <th
-                      style={toplamHucreStili}
-                      colSpan="3"
-                    >
-                      TOPLAM CARİ BORCU
-                    </th>
+                            <td
+                              style={
+                                hucreStili
+                              }
+                            >
+                              {paraFormatla(
+                                cari.toplamGider
+                              )}
+                            </td>
 
-                    <th style={toplamHucreStili}>
-                      {paraFormatla(toplamCariBorcu)}
-                    </th>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </RaporKutusu>
+                            <td
+                              style={
+                                hucreStili
+                              }
+                            >
+                              {paraFormatla(
+                                cari.toplamOdeme
+                              )}
+                            </td>
+
+                            <td
+                              style={
+                                hucreStili
+                              }
+                            >
+                              {paraFormatla(
+                                cari.kalanBakiye
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      )
+                    )}
+                  </tbody>
+
+                  <tfoot>
+                    <tr>
+                      <th
+                        style={
+                          toplamHucreStili
+                        }
+                        colSpan="3"
+                      >
+                        TOPLAM CARİ BORCU
+                      </th>
+
+                      <th
+                        style={
+                          toplamHucreStili
+                        }
+                      >
+                        {paraFormatla(
+                          toplamCariBorcu
+                        )}
+                      </th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </RaporKutusu>
+          )}
 
           <RaporKutusu baslik="Günlük Özet">
-            <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                overflowX: "auto",
+              }}
+            >
               <table style={tabloStili}>
                 <thead>
                   <tr>
-                    <th style={hucreStili}>Tarih</th>
-                    <th style={hucreStili}>Nakit</th>
+                    <th style={hucreStili}>
+                      Tarih
+                    </th>
+
+                    <th style={hucreStili}>
+                      Nakit
+                    </th>
+
                     <th style={hucreStili}>
                       Kredi Kartı
                     </th>
-                    <th style={hucreStili}>
-                      Havale
-                    </th>
+
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th style={hucreStili}>
+                        Havale
+                      </th>
+                    )}
+
                     <th style={hucreStili}>
                       Toplam Gelir
                     </th>
-                    <th style={hucreStili}>Gider</th>
-                    <th style={hucreStili}>Ödeme</th>
+
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th style={hucreStili}>
+                        Gider
+                      </th>
+                    )}
+
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th style={hucreStili}>
+                        Ödeme
+                      </th>
+                    )}
+
                     <th style={hucreStili}>
                       Kâr / Zarar
                     </th>
+
                     <th style={hucreStili}>
                       Kasa Net
                     </th>
@@ -733,21 +1093,30 @@ export default function Raporlar() {
                     <tr>
                       <td
                         style={hucreStili}
-                        colSpan="9"
+                        colSpan={
+                          secilenIsletme ===
+                          "bufe"
+                            ? "6"
+                            : "9"
+                        }
                       >
-                        Seçilen tarih aralığında kayıt
-                        bulunamadı.
+                        Seçilen filtrelere uygun
+                        kayıt bulunamadı.
                       </td>
                     </tr>
                   ) : (
                     gunlukOzet.map((gun) => (
                       <tr key={gun.tarih}>
                         <td style={hucreStili}>
-                          {tarihFormatla(gun.tarih)}
+                          {tarihFormatla(
+                            gun.tarih
+                          )}
                         </td>
 
                         <td style={hucreStili}>
-                          {paraFormatla(gun.nakit)}
+                          {paraFormatla(
+                            gun.nakit
+                          )}
                         </td>
 
                         <td style={hucreStili}>
@@ -756,17 +1125,24 @@ export default function Raporlar() {
                           )}
                         </td>
 
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            gun.bankaHavalesi
-                          )}
-                        </td>
+                        {secilenIsletme !==
+                          "bufe" && (
+                          <td
+                            style={hucreStili}
+                          >
+                            {paraFormatla(
+                              gun.bankaHavalesi
+                            )}
+                          </td>
+                        )}
 
                         <td style={hucreStili}>
-                          {gun.toplamGelir === 0 ? (
+                          {gun.toplamGelir ===
+                          0 ? (
                             <span
                               style={{
-                                color: "#dc2626",
+                                color:
+                                  "#dc2626",
                                 fontWeight: 600,
                               }}
                             >
@@ -779,17 +1155,27 @@ export default function Raporlar() {
                           )}
                         </td>
 
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            gun.toplamGider
-                          )}
-                        </td>
+                        {secilenIsletme !==
+                          "bufe" && (
+                          <td
+                            style={hucreStili}
+                          >
+                            {paraFormatla(
+                              gun.toplamGider
+                            )}
+                          </td>
+                        )}
 
-                        <td style={hucreStili}>
-                          {paraFormatla(
-                            gun.toplamOdeme
-                          )}
-                        </td>
+                        {secilenIsletme !==
+                          "bufe" && (
+                          <td
+                            style={hucreStili}
+                          >
+                            {paraFormatla(
+                              gun.toplamOdeme
+                            )}
+                          </td>
+                        )}
 
                         <td
                           style={{
@@ -798,12 +1184,15 @@ export default function Raporlar() {
                             color:
                               gun.karZarar < 0
                                 ? "#dc2626"
-                                : gun.karZarar > 0
+                                : gun.karZarar >
+                                    0
                                   ? "#059669"
                                   : "inherit",
                           }}
                         >
-                          {paraFormatla(gun.karZarar)}
+                          {paraFormatla(
+                            gun.karZarar
+                          )}
                         </td>
 
                         <td
@@ -813,12 +1202,15 @@ export default function Raporlar() {
                             color:
                               gun.kasaNet < 0
                                 ? "#dc2626"
-                                : gun.kasaNet > 0
+                                : gun.kasaNet >
+                                    0
                                   ? "#059669"
                                   : "inherit",
                           }}
                         >
-                          {paraFormatla(gun.kasaNet)}
+                          {paraFormatla(
+                            gun.kasaNet
+                          )}
                         </td>
                       </tr>
                     ))
@@ -827,45 +1219,89 @@ export default function Raporlar() {
 
                 <tfoot>
                   <tr>
-                    <th style={toplamHucreStili}>
+                    <th
+                      style={toplamHucreStili}
+                    >
                       TOPLAM
                     </th>
 
-                    <th style={toplamHucreStili}>
+                    <th
+                      style={toplamHucreStili}
+                    >
                       {paraFormatla(
-                        gelirDagilimi.nakit_satis
+                        gelirDagilimi
+                          .nakit_satis
                       )}
                     </th>
 
-                    <th style={toplamHucreStili}>
+                    <th
+                      style={toplamHucreStili}
+                    >
                       {paraFormatla(
-                        gelirDagilimi.kredi_karti_satis
+                        gelirDagilimi
+                          .kredi_karti_satis
                       )}
                     </th>
 
-                    <th style={toplamHucreStili}>
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th
+                        style={
+                          toplamHucreStili
+                        }
+                      >
+                        {paraFormatla(
+                          gelirDagilimi
+                            .banka_havalesi
+                        )}
+                      </th>
+                    )}
+
+                    <th
+                      style={toplamHucreStili}
+                    >
                       {paraFormatla(
-                        gelirDagilimi.banka_havalesi
+                        toplamGelir
                       )}
                     </th>
 
-                    <th style={toplamHucreStili}>
-                      {paraFormatla(toplamGelir)}
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th
+                        style={
+                          toplamHucreStili
+                        }
+                      >
+                        {paraFormatla(
+                          toplamGider
+                        )}
+                      </th>
+                    )}
+
+                    {secilenIsletme !==
+                      "bufe" && (
+                      <th
+                        style={
+                          toplamHucreStili
+                        }
+                      >
+                        {paraFormatla(
+                          toplamOdeme
+                        )}
+                      </th>
+                    )}
+
+                    <th
+                      style={toplamHucreStili}
+                    >
+                      {paraFormatla(
+                        karZarar
+                      )}
                     </th>
 
-                    <th style={toplamHucreStili}>
-                      {paraFormatla(toplamGider)}
-                    </th>
-
-                    <th style={toplamHucreStili}>
-                      {paraFormatla(toplamOdeme)}
-                    </th>
-
-                    <th style={toplamHucreStili}>
-                      {paraFormatla(karZarar)}
-                    </th>
-
-                    <th style={toplamHucreStili}>
+                    <th
+                      style={toplamHucreStili}
+                    >
                       {paraFormatla(
                         kasaNetHareketi
                       )}
@@ -934,7 +1370,10 @@ function OzetKarti({
   );
 }
 
-function RaporKutusu({ baslik, children }) {
+function RaporKutusu({
+  baslik,
+  children,
+}) {
   return (
     <section style={raporKutusuStili}>
       <h2
@@ -961,25 +1400,36 @@ function DagilimSatiri({
   return (
     <div style={dagilimSatiriStili}>
       <span>{baslik}</span>
-      <strong>{paraFormatla(tutar)}</strong>
-      <span>{yuzdeHesapla(tutar, toplam)}</span>
+
+      <strong>
+        {paraFormatla(tutar)}
+      </strong>
+
+      <span>
+        {yuzdeHesapla(tutar, toplam)}
+      </span>
     </div>
   );
 }
 
 function tarihYaz(tarih) {
   const yil = tarih.getFullYear();
-  const ay = String(tarih.getMonth() + 1).padStart(
-    2,
-    "0"
-  );
-  const gun = String(tarih.getDate()).padStart(2, "0");
+
+  const ay = String(
+    tarih.getMonth() + 1
+  ).padStart(2, "0");
+
+  const gun = String(
+    tarih.getDate()
+  ).padStart(2, "0");
 
   return `${yil}-${ay}-${gun}`;
 }
 
 function tarihFormatla(tarih) {
-  if (!tarih) return "-";
+  if (!tarih) {
+    return "-";
+  }
 
   return new Date(
     `${tarih}T00:00:00`
@@ -988,11 +1438,20 @@ function tarihFormatla(tarih) {
 
 function giderTuruYaz(tur) {
   const turler = {
-    tedarikci_alimi: "Tedarikçi Alımı",
-    personel_maasi: "Personel Maaşı",
-    vergi: "Vergi",
-    elektrik_su_diger: "Elektrik, Su ve Diğer",
-    ekstra_harcamalar: "Ekstra Harcamalar",
+    tedarikci_alimi:
+      "Tedarikçi Alımı",
+
+    personel_maasi:
+      "Personel Maaşı",
+
+    vergi:
+      "Vergi",
+
+    elektrik_su_diger:
+      "Elektrik, Su ve Diğer",
+
+    ekstra_harcamalar:
+      "Ekstra Harcamalar",
   };
 
   return turler[tur] || tur;
@@ -1018,6 +1477,7 @@ const etiketStili = {
 const inputStili = {
   padding: 9,
   boxSizing: "border-box",
+  minWidth: 150,
 };
 
 const kartAlaniStili = {
@@ -1043,6 +1503,12 @@ const ikiKolonStili = {
   gap: 20,
 };
 
+const tekKolonStili = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 20,
+};
+
 const raporKutusuStili = {
   marginBottom: 25,
   padding: 20,
@@ -1054,7 +1520,8 @@ const raporKutusuStili = {
 
 const dagilimSatiriStili = {
   display: "grid",
-  gridTemplateColumns: "1fr auto 60px",
+  gridTemplateColumns:
+    "1fr auto 60px",
   gap: 12,
   padding: "10px 0",
   borderBottom: "1px solid #e5e7eb",
@@ -1062,7 +1529,8 @@ const dagilimSatiriStili = {
 
 const toplamSatiriStili = {
   display: "grid",
-  gridTemplateColumns: "1fr auto 60px",
+  gridTemplateColumns:
+    "1fr auto 60px",
   gap: 12,
   paddingTop: 14,
 };

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
+import logo from "../logo.png";
 
 export default function Login({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [kullaniciAdi, setKullaniciAdi] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [mesaj, setMesaj] = useState("");
@@ -11,6 +12,8 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setLoading(true);
     setMesaj("");
+
+    const email = `${kullaniciAdi.trim().toLowerCase()}@sekafe.local`;
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -28,34 +31,86 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "100px auto" }}>
-      <h1>Sekafe Muhasebe</h1>
+    <div
+      style={{
+        maxWidth: 400,
+        margin: "70px auto",
+        textAlign: "center",
+      }}
+    >
+      <img
+        src={logo}
+        alt="Sekafe Muhasebe"
+        style={{
+          width: 220,
+          height: "auto",
+          marginBottom: 20,
+        }}
+      />
+
+      <h2
+        style={{
+          margin: 0,
+          marginBottom: 30,
+        }}
+      >
+        Hoş Geldiniz
+      </h2>
 
       <form onSubmit={handleSubmit}>
         <input
-          type="email"
-          placeholder="E-posta"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="Kullanıcı Adı"
+          value={kullaniciAdi}
+          onChange={(e) => setKullaniciAdi(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            boxSizing: "border-box",
+          }}
         />
 
-        <br /><br />
+        <br />
+        <br />
 
         <input
           type="password"
           placeholder="Şifre"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            boxSizing: "border-box",
+          }}
         />
 
-        <br /><br />
+        <br />
+        <br />
 
-        <button disabled={loading}>
-          {loading ? "Giriş..." : "Giriş Yap"}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "10px",
+            cursor: loading ? "default" : "pointer",
+          }}
+        >
+          {loading ? "Giriş Yapılıyor..." : "Giriş Yap"}
         </button>
       </form>
 
-      <p>{mesaj}</p>
+      {mesaj && (
+        <p
+          style={{
+            color: "red",
+            marginTop: 15,
+          }}
+        >
+          {mesaj}
+        </p>
+      )}
     </div>
   );
 }

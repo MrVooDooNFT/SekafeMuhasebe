@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import GiderDuzenleModal from "./GiderDuzenleModal";
 import OdemeDuzenleModal from "./OdemeDuzenleModal";
+import { logEkle } from "../utils/logEkle";
 
 export default function CariDetay({
   cari,
@@ -193,13 +194,35 @@ export default function CariDetay({
       .eq("id", hareket.kayitId);
 
     if (error) {
-      setMesaj(`Kayıt silinemedi: ${error.message}`);
-      setHataVar(true);
-      return;
-    }
+  setMesaj(`Kayıt silinemedi: ${error.message}`);
+  setHataVar(true);
+  return;
+}
 
-    setMesaj(`${hareket.tip} kaydı silindi.`);
-    await hareketleriYenile();
+const silinenTutar =
+  hareket.tip === "Gider"
+    ? hareket.hamKayit?.toplam_tutar
+    : hareket.hamKayit?.tutar;
+
+await logEkle(
+  hareket.tip === "Gider"
+    ? "Gider Silindi"
+    : "Ödeme Silindi",
+  `${cari.cari_adi || "Cari"} - ${Number(
+    silinenTutar || 0
+  ).toLocaleString("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+  })}${
+    hareket.aciklama
+      ? ` - ${hareket.aciklama}`
+      : ""
+  }`,
+  hareket.kayitId
+);
+
+setMesaj(`${hareket.tip} kaydı silindi.`);
+await hareketleriYenile();
   }
 
   async function hareketleriYenile() {
@@ -290,7 +313,75 @@ export default function CariDetay({
 
     return yollar[odemeYolu] || odemeYolu;
   }
+async function cariyiSil() {
+  const onay = window.confirm(
+    `"${cari.cari_adi}" carisini silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.`
+  );
 
+  if (!onay) return;
+
+  setMesaj("");
+  setHataVar(false);
+
+  const { count: giderSayisi, error: giderKontrolHatasi } =
+    await supabase
+      .from("giderler")
+      .select("id", { count: "exact", head: true })
+      .eq("cari_id", cari.id);
+
+  if (giderKontrolHatasi) {
+    setMesaj(
+      `Cari kontrol edilemedi: ${giderKontrolHatasi.message}`
+    );
+    setHataVar(true);
+    return;
+  }
+
+  const { count: odemeSayisi, error: odemeKontrolHatasi } =
+    await supabase
+      .from("gider_odemeleri")
+      .select("id", { count: "exact", head: true })
+      .eq("cari_id", cari.id);
+
+  if (odemeKontrolHatasi) {
+    setMesaj(
+      `Cari kontrol edilemedi: ${odemeKontrolHatasi.message}`
+    );
+    setHataVar(true);
+    return;
+  }
+
+  if ((giderSayisi || 0) > 0 || (odemeSayisi || 0) > 0) {
+    setMesaj(
+      "Bu cariye ait gider veya ödeme kayıtları bulunduğu için cari silinemez."
+    );
+    setHataVar(true);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("cariler")
+    .delete()
+    .eq("id", cari.id);
+
+  if (error) {
+    setMesaj(`Cari silinemedi: ${error.message}`);
+    setHataVar(true);
+    return;
+  }
+
+  await logEkle(
+    "Cari Silindi",
+    cari.cari_adi || "Cari",
+    cari.id
+  );
+
+  if (onDegisiklik) {
+    await onDegisiklik();
+  }
+
+  onGeriDon();
+}
   return (
     <div>
       <button type="button" onClick={onGeriDon}>
@@ -395,16 +486,33 @@ export default function CariDetay({
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setCariDuzenleniyor(true);
-              setMesaj("");
-              setHataVar(false);
-            }}
-          >
-            Cari Bilgilerini Düzenle
-          </button>
+<div
+  style={{
+    display: "flex",
+    gap: 10,
+  }}
+>
+  <button
+    type="button"
+    onClick={() => {
+      setCariDuzenleniyor(true);
+      setMesaj("");
+      setHataVar(false);
+    }}
+  >
+    Cari Bilgilerini Düzenle
+  </button>
+
+  <button
+    type="button"
+    onClick={cariyiSil}
+    style={{
+      color: "#dc2626",
+    }}
+  >
+    Cariyi Sil
+  </button>
+</div>
         </div>
       )}
 
@@ -582,7 +690,10 @@ export default function CariDetay({
 
       {duzenlenenGider && (
         <GiderDuzenleModal
-          gider={duzenlenenGider}
+       gider={{
+  ...duzenlenenGider,
+  cari_adi: cari.cari_adi,
+}}
           onKapat={() => setDuzenlenenGider(null)}
           onKaydedildi={async () => {
             setDuzenlenenGider(null);
@@ -594,7 +705,10 @@ export default function CariDetay({
 
       {duzenlenenOdeme && (
         <OdemeDuzenleModal
-          odeme={duzenlenenOdeme}
+         odeme={{
+  ...duzenlenenOdeme,
+  cari_adi: cari.cari_adi,
+}}
           cariId={cari.id}
           onKapat={() => setDuzenlenenOdeme(null)}
           onKaydedildi={async () => {

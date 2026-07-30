@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { logEkle } from "../utils/logEkle";
 
 export default function OdemeForm() {
   const [cariler, setCariler] = useState([]);
@@ -87,6 +88,24 @@ export default function OdemeForm() {
       setKaydediliyor(false);
       return;
     }
+    const secilenCari = cariler.find(
+  (cari) => String(cari.id) === String(form.cari_id)
+);
+
+await logEkle(
+  "Ödeme Eklendi",
+  `${secilenCari?.cari_adi || "Cari"} - ${tutar.toLocaleString(
+    "tr-TR",
+    {
+      style: "currency",
+      currency: "TRY",
+    }
+  )} - ${form.odeme_yolu}${
+    form.aciklama.trim()
+      ? ` - ${form.aciklama.trim()}`
+      : ""
+  }`
+);
 
     setMesaj("Ödeme başarıyla kaydedildi.");
 

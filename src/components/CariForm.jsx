@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import CariDetay from "./CariDetay";
+import { logEkle } from "../utils/logEkle";
 
 export default function CariForm() {
   const [cariler, setCariler] = useState([]);
@@ -146,10 +147,15 @@ export default function CariForm() {
       notlar: "",
     });
 
-    setKaydediliyor(false);
-    setMesaj("Cari başarıyla kaydedildi.");
+   setKaydediliyor(false);
+setMesaj("Cari başarıyla kaydedildi.");
 
-    await carileriGetir();
+await logEkle(
+  "Cari Eklendi",
+  form.cari_adi.trim()
+);
+
+await carileriGetir();
   }
 
   const tumGiderler = useMemo(() => {

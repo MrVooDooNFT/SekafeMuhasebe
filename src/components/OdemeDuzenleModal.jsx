@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
+import { logEkle } from "../utils/logEkle";
 
 export default function OdemeDuzenleModal({
   odeme,
@@ -47,13 +48,29 @@ export default function OdemeDuzenleModal({
       .eq("id", odeme.id);
 
     if (error) {
-      setMesaj(`Ödeme güncellenemedi: ${error.message}`);
-      setKaydediliyor(false);
-      return;
-    }
+  setMesaj(`Ödeme güncellenemedi: ${error.message}`);
+  setKaydediliyor(false);
+  return;
+}
 
-    setKaydediliyor(false);
-    await onKaydedildi();
+await logEkle(
+  "Ödeme Güncellendi",
+  `${odeme.cari_adi || "Cari"} - ${Number(
+    odeme.tutar || 0
+  ).toLocaleString("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+  })} → ${sayisalTutar.toLocaleString("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+  })} - ${odemeYolu}${
+    aciklama.trim() ? ` - ${aciklama.trim()}` : ""
+  }`,
+  odeme.id
+);
+
+setKaydediliyor(false);
+await onKaydedildi();
   }
 
   return (

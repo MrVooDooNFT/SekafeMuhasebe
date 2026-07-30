@@ -5,6 +5,7 @@ export default function Kasa() {
   const [gelirler, setGelirler] = useState([]);
   const [odemeler, setOdemeler] = useState([]);
 
+  const [secilenIsletme, setSecilenIsletme] = useState("tumu");
   const [baslangicTarihi, setBaslangicTarihi] = useState("");
   const [bitisTarihi, setBitisTarihi] = useState("");
 
@@ -21,7 +22,16 @@ export default function Kasa() {
 
     const { data: gelirData, error: gelirError } = await supabase
       .from("gelirler")
-      .select("id, tarih, tur, tutar, aciklama");
+      .select(`
+        id,
+        tarih,
+        isletme,
+        tur,
+        tutar,
+        kart_1_tutar,
+        kart_2_tutar,
+        aciklama
+      `);
 
     if (gelirError) {
       setMesaj(`Gelirler alınamadı: ${gelirError.message}`);
@@ -67,20 +77,111 @@ export default function Kasa() {
   }
 
   const filtreliGelirler = useMemo(() => {
-    return gelirler.filter((gelir) => tarihAraligindaMi(gelir.tarih));
-  }, [gelirler, baslangicTarihi, bitisTarihi]);
+    return gelirler.filter((gelir) => {
+      const tarihUygun = tarihAraligindaMi(gelir.tarih);
+
+      const isletmeUygun =
+        secilenIsletme === "tumu" ||
+        gelir.isletme === secilenIsletme;
+
+      return tarihUygun && isletmeUygun;
+    });
+  }, [
+    gelirler,
+    secilenIsletme,
+    baslangicTarihi,
+    bitisTarihi,
+  ]);
 
   const filtreliOdemeler = useMemo(() => {
-    return odemeler.filter((odeme) => tarihAraligindaMi(odeme.tarih));
-  }, [odemeler, baslangicTarihi, bitisTarihi]);
+    if (secilenIsletme === "bufe") {
+      return [];
+    }
+
+    return odemeler.filter((odeme) =>
+      tarihAraligindaMi(odeme.tarih)
+    );
+  }, [
+    odemeler,
+    secilenIsletme,
+    baslangicTarihi,
+    bitisTarihi,
+  ]);
+
+  const cafeToplamGelir = useMemo(() => {
+    return filtreliGelirler
+      .filter((gelir) => gelir.isletme === "cafe")
+      .reduce(
+        (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+        0
+      );
+  }, [filtreliGelirler]);
+
+  const bufeToplamGelir = useMemo(() => {
+    return filtreliGelirler
+      .filter((gelir) => gelir.isletme === "bufe")
+      .reduce(
+        (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+        0
+      );
+  }, [filtreliGelirler]);
+
+  const nakitSatisToplami = useMemo(() => {
+    return filtreliGelirler
+      .filter((gelir) => gelir.tur === "nakit_satis")
+      .reduce(
+        (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+        0
+      );
+  }, [filtreliGelirler]);
+
+  const krediKartiSatisToplami = useMemo(() => {
+    return filtreliGelirler
+      .filter((gelir) => gelir.tur === "kredi_karti_satis")
+      .reduce(
+        (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+        0
+      );
+  }, [filtreliGelirler]);
+
+  const bankaHavalesiToplami = useMemo(() => {
+    return filtreliGelirler
+      .filter((gelir) => gelir.tur === "banka_havalesi")
+      .reduce(
+        (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+        0
+      );
+  }, [filtreliGelirler]);
+
+  const toplamGelir = useMemo(() => {
+    return filtreliGelirler.reduce(
+      (toplam, gelir) => toplam + Number(gelir.tutar || 0),
+      0
+    );
+  }, [filtreliGelirler]);
+
+  const toplamOdeme = useMemo(() => {
+    return filtreliOdemeler.reduce(
+      (toplam, odeme) => toplam + Number(odeme.tutar || 0),
+      0
+    );
+  }, [filtreliOdemeler]);
+
+  const netBakiye = toplamGelir - toplamOdeme;
 
   const hareketler = useMemo(() => {
     const gelirHareketleri = filtreliGelirler.map((gelir) => ({
       id: `gelir-${gelir.id}`,
       tarih: gelir.tarih,
       tip: "Gelir",
+      isletme:
+        gelir.isletme === "bufe"
+          ? "Büfe"
+          : "Cafe",
       tur: gelirTuruYaz(gelir.tur),
-      aciklama: gelir.aciklama || gelirTuruYaz(gelir.tur),
+      aciklama:
+        gelir.aciklama ||
+        gelirTuruYaz(gelir.tur),
       giris: Number(gelir.tutar || 0),
       cikis: 0,
     }));
@@ -89,6 +190,7 @@ export default function Kasa() {
       id: `odeme-${odeme.id}`,
       tarih: odeme.tarih,
       tip: "Ödeme",
+      isletme: "Cafe",
       tur: odemeYoluYaz(odeme.odeme_yolu),
       aciklama:
         odeme.aciklama ||
@@ -103,7 +205,10 @@ export default function Kasa() {
       ...odemeHareketleri,
     ].sort((a, b) => {
       if (a.tarih === b.tarih) {
-        if (a.tip === b.tip) return 0;
+        if (a.tip === b.tip) {
+          return 0;
+        }
+
         return a.tip === "Gelir" ? -1 : 1;
       }
 
@@ -121,33 +226,13 @@ export default function Kasa() {
         bakiye,
       };
     });
-  }, [filtreliGelirler, filtreliOdemeler]);
-
-  const nakitSatisToplami = filtreliGelirler
-    .filter((gelir) => gelir.tur === "nakit_satis")
-    .reduce((toplam, gelir) => toplam + Number(gelir.tutar || 0), 0);
-
-  const krediKartiSatisToplami = filtreliGelirler
-    .filter((gelir) => gelir.tur === "kredi_karti_satis")
-    .reduce((toplam, gelir) => toplam + Number(gelir.tutar || 0), 0);
-
-  const bankaHavalesiToplami = filtreliGelirler
-    .filter((gelir) => gelir.tur === "banka_havalesi")
-    .reduce((toplam, gelir) => toplam + Number(gelir.tutar || 0), 0);
-
-  const toplamGelir =
-    nakitSatisToplami +
-    krediKartiSatisToplami +
-    bankaHavalesiToplami;
-
-  const toplamOdeme = filtreliOdemeler.reduce(
-    (toplam, odeme) => toplam + Number(odeme.tutar || 0),
-    0
-  );
-
-  const netBakiye = toplamGelir - toplamOdeme;
+  }, [
+    filtreliGelirler,
+    filtreliOdemeler,
+  ]);
 
   function filtreyiTemizle() {
+    setSecilenIsletme("tumu");
     setBaslangicTarihi("");
     setBitisTarihi("");
   }
@@ -160,9 +245,13 @@ export default function Kasa() {
   }
 
   function tarihFormatla(tarih) {
-    if (!tarih) return "-";
+    if (!tarih) {
+      return "-";
+    }
 
-    return new Date(`${tarih}T00:00:00`).toLocaleDateString("tr-TR");
+    return new Date(
+      `${tarih}T00:00:00`
+    ).toLocaleDateString("tr-TR");
   }
 
   function gelirTuruYaz(tur) {
@@ -212,8 +301,30 @@ export default function Kasa() {
       >
         <div>
           <label
+            htmlFor="kasa-isletme"
+            style={etiketStili}
+          >
+            İşletme
+          </label>
+
+          <select
+            id="kasa-isletme"
+            value={secilenIsletme}
+            onChange={(event) =>
+              setSecilenIsletme(event.target.value)
+            }
+            style={inputStili}
+          >
+            <option value="tumu">Tümü</option>
+            <option value="cafe">Cafe</option>
+            <option value="bufe">Büfe</option>
+          </select>
+        </div>
+
+        <div>
+          <label
             htmlFor="kasa-baslangic"
-            style={{ display: "block", marginBottom: 5 }}
+            style={etiketStili}
           >
             Başlangıç Tarihi
           </label>
@@ -232,7 +343,7 @@ export default function Kasa() {
         <div>
           <label
             htmlFor="kasa-bitis"
-            style={{ display: "block", marginBottom: 5 }}
+            style={etiketStili}
           >
             Bitiş Tarihi
           </label>
@@ -248,7 +359,11 @@ export default function Kasa() {
           />
         </div>
 
-        <button type="button" onClick={filtreyiTemizle}>
+        <button
+          type="button"
+          onClick={filtreyiTemizle}
+          style={butonStili}
+        >
           Filtreyi Temizle
         </button>
       </div>
@@ -262,6 +377,34 @@ export default function Kasa() {
           marginBottom: 25,
         }}
       >
+        {secilenIsletme === "tumu" && (
+          <>
+            <OzetKutusu
+              baslik="Cafe Toplam Gelir"
+              tutar={paraFormatla(cafeToplamGelir)}
+            />
+
+            <OzetKutusu
+              baslik="Büfe Toplam Gelir"
+              tutar={paraFormatla(bufeToplamGelir)}
+            />
+          </>
+        )}
+
+        {secilenIsletme === "cafe" && (
+          <OzetKutusu
+            baslik="Cafe Toplam Gelir"
+            tutar={paraFormatla(cafeToplamGelir)}
+          />
+        )}
+
+        {secilenIsletme === "bufe" && (
+          <OzetKutusu
+            baslik="Büfe Toplam Gelir"
+            tutar={paraFormatla(bufeToplamGelir)}
+          />
+        )}
+
         <OzetKutusu
           baslik="Nakit Satış"
           tutar={paraFormatla(nakitSatisToplami)}
@@ -272,23 +415,31 @@ export default function Kasa() {
           tutar={paraFormatla(krediKartiSatisToplami)}
         />
 
-        <OzetKutusu
-          baslik="Banka Havalesi"
-          tutar={paraFormatla(bankaHavalesiToplami)}
-        />
+        {secilenIsletme !== "bufe" && (
+          <OzetKutusu
+            baslik="Banka Havalesi"
+            tutar={paraFormatla(bankaHavalesiToplami)}
+          />
+        )}
 
         <OzetKutusu
           baslik="Toplam Gelir"
           tutar={paraFormatla(toplamGelir)}
         />
 
-        <OzetKutusu
-          baslik="Toplam Ödeme"
-          tutar={paraFormatla(toplamOdeme)}
-        />
+        {secilenIsletme !== "bufe" && (
+          <OzetKutusu
+            baslik="Toplam Ödeme"
+            tutar={paraFormatla(toplamOdeme)}
+          />
+        )}
 
         <OzetKutusu
-          baslik="Net Bakiye"
+          baslik={
+            secilenIsletme === "bufe"
+              ? "Büfe Toplamı"
+              : "Net Bakiye"
+          }
           tutar={paraFormatla(netBakiye)}
         />
       </div>
@@ -298,7 +449,11 @@ export default function Kasa() {
       {yukleniyor ? (
         <p>Kasa hareketleri yükleniyor...</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div
+          style={{
+            overflowX: "auto",
+          }}
+        >
           <table
             style={{
               width: "100%",
@@ -309,6 +464,7 @@ export default function Kasa() {
               <tr>
                 <th style={hucreStili}>Tarih</th>
                 <th style={hucreStili}>İşlem</th>
+                <th style={hucreStili}>İşletme</th>
                 <th style={hucreStili}>Tür</th>
                 <th style={hucreStili}>Açıklama</th>
                 <th style={hucreStili}>Giriş</th>
@@ -320,8 +476,11 @@ export default function Kasa() {
             <tbody>
               {hareketler.length === 0 ? (
                 <tr>
-                  <td style={hucreStili} colSpan="7">
-                    Seçilen tarih aralığında kasa hareketi bulunamadı.
+                  <td
+                    style={hucreStili}
+                    colSpan="8"
+                  >
+                    Seçilen filtrelere uygun kasa hareketi bulunamadı.
                   </td>
                 </tr>
               ) : (
@@ -331,9 +490,17 @@ export default function Kasa() {
                       {tarihFormatla(hareket.tarih)}
                     </td>
 
-                    <td style={hucreStili}>{hareket.tip}</td>
+                    <td style={hucreStili}>
+                      {hareket.tip}
+                    </td>
 
-                    <td style={hucreStili}>{hareket.tur}</td>
+                    <td style={hucreStili}>
+                      {hareket.isletme}
+                    </td>
+
+                    <td style={hucreStili}>
+                      {hareket.tur}
+                    </td>
 
                     <td style={hucreStili}>
                       {hareket.aciklama}
@@ -361,7 +528,10 @@ export default function Kasa() {
 
             <tfoot>
               <tr>
-                <th style={toplamHucreStili} colSpan="4">
+                <th
+                  style={toplamHucreStili}
+                  colSpan="5"
+                >
                   TOPLAM
                 </th>
 
@@ -370,7 +540,9 @@ export default function Kasa() {
                 </th>
 
                 <th style={toplamHucreStili}>
-                  {paraFormatla(toplamOdeme)}
+                  {secilenIsletme === "bufe"
+                    ? "-"
+                    : paraFormatla(toplamOdeme)}
                 </th>
 
                 <th style={toplamHucreStili}>
@@ -418,9 +590,20 @@ function OzetKutusu({ baslik, tutar }) {
   );
 }
 
+const etiketStili = {
+  display: "block",
+  marginBottom: 5,
+};
+
 const inputStili = {
   padding: 10,
   boxSizing: "border-box",
+  minWidth: 160,
+};
+
+const butonStili = {
+  padding: "10px 14px",
+  cursor: "pointer",
 };
 
 const hucreStili = {

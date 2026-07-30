@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
+import { logEkle } from "../utils/logEkle";
 
 export default function GiderDuzenleModal({
   gider,
@@ -45,13 +46,33 @@ export default function GiderDuzenleModal({
       .eq("id", gider.id);
 
     if (error) {
-      setMesaj(`Gider güncellenemedi: ${error.message}`);
-      setKaydediliyor(false);
-      return;
-    }
+  setMesaj(`Gider güncellenemedi: ${error.message}`);
+  setKaydediliyor(false);
+  return;
+}
 
-    setKaydediliyor(false);
-    await onKaydedildi();
+const cariAdi =
+  gider.cari_adi ||
+  gider.cariler?.cari_adi ||
+  "Cari";
+
+await logEkle(
+  "Gider Güncellendi",
+  `${cariAdi} - ${Number(gider.toplam_tutar || 0).toLocaleString(
+    "tr-TR",
+    {
+      style: "currency",
+      currency: "TRY",
+    }
+  )} → ${tutar.toLocaleString("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+  })} - ${aciklama.trim() || gider.aciklama || "Açıklama yok"}`,
+  gider.id
+);
+
+setKaydediliyor(false);
+await onKaydedildi();
   }
 
   return (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { logEkle } from "../utils/logEkle";
 
 export default function GiderForm() {
   const bugun = new Date().toISOString().split("T")[0];
@@ -160,7 +161,22 @@ export default function GiderForm() {
         return;
       }
     }
+const secilenCari = cariler.find(
+  (cari) => String(cari.id) === String(cariId)
+);
 
+await logEkle(
+  odendiMi ? "Gider ve Ödeme Eklendi" : "Gider Eklendi",
+  `${secilenCari?.cari_adi || "Cari seçilmedi"} - ${Number(
+    toplamTutar
+  ).toLocaleString("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+  })}${odendiMi ? ` - ${odemeYolu}` : ""}${
+    aciklama.trim() ? ` - ${aciklama.trim()}` : ""
+  }`,
+  giderKaydi.id
+);
     setLoading(false);
 
     setMesaj(

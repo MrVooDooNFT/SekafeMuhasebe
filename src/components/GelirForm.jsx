@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
+import { logEkle } from "../utils/logEkle";
 
 export default function GelirForm() {
   const bugun = new Date().toISOString().split("T")[0];
@@ -210,7 +211,7 @@ export default function GelirForm() {
       setHataVar(true);
       return;
     }
-
+const guncellemeMi = kayitMevcut;
     setLoading(true);
 
     const {
@@ -297,7 +298,12 @@ export default function GelirForm() {
         return;
       }
     }
-
+await logEkle(
+  guncellemeMi ? "Gelir Güncellendi" : "Gelir Eklendi",
+  `${
+    isletme === "cafe" ? "Cafe" : "Büfe"
+  } - ${tarih} - Toplam: ${paraFormatla(gunlukToplam)}`
+);
     setLoading(false);
     setKayitMevcut(true);
 
