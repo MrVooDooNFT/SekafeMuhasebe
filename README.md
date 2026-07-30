@@ -1,16 +1,85 @@
-# React + Vite
+# Sekafe Muhasebe
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sekafe Muhasebe is a simple accounting application developed for small businesses that need to manage their daily financial operations without unnecessary complexity.
 
-Currently, two official plugins are available:
+The application focuses on the essential needs of a business, including customer accounts, income, expenses, payments, cash tracking, reporting, and data backup. It is designed to be easy to learn, fast to use, and practical for everyday office work.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- User authentication
+- Customer account management
+- Income tracking
+- Expense tracking
+- Partial payment management
+- Cash register overview
+- Financial reports
+- User administration
+- Activity logs
+- Backup and restore
+- Responsive interface
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Built With
+
+- React
+- Vite
+- Supabase
+- React Router
+
+---
+
+## Backup
+
+The application allows users to create a complete backup of their business data in a single `.skf` file and restore it whenever necessary.
+
+---
+
+## Activity Logging
+
+Administrative operations are automatically recorded to provide a basic audit history.
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/MrVooDooNFT/SekafeMuhasebe.git
+cd SekafeMuhasebe
+npm install
+```
+
+Create a `.env` file:
+
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+---
+
+## Project Structure
+
+```
+src/
+├── components/
+├── pages/
+├── utils/
+├── App.jsx
+├── main.jsx
+└── supabase.js
+```
+
+---
+
+## License
+
+Private project.
