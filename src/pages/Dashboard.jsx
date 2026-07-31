@@ -8,6 +8,7 @@ import { useState } from "react";
 import { supabase } from "../supabase";
 import GelirForm from "../components/GelirForm";
 import logo from "../logo.png";
+import Stok from "../components/Stok";
 
 export default function Dashboard({ kullanici }) {
   const [menu, setMenu] = useState("Dashboard");
@@ -109,6 +110,16 @@ export default function Dashboard({ kullanici }) {
             >
               Raporlar
             </button>
+            <button
+  onClick={() => setMenu("Stok")}
+  style={{
+    display: "block",
+    width: "100%",
+    marginBottom: 10,
+  }}
+>
+  Stok
+</button>
 
             <button
               onClick={() => setMenu("Yönetim")}
@@ -189,6 +200,7 @@ export default function Dashboard({ kullanici }) {
 
         {yonetici && menu === "Kasa" && <Kasa />}
         {yonetici && menu === "Raporlar" && <Raporlar />}
+        {yonetici && menu === "Stok" && <Stok />}
         {yonetici && menu === "Yönetim" && <Yonetim />}
       </div>
     </div>
