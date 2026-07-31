@@ -11,7 +11,7 @@ import logo from "../logo.png";
 import Stok from "../components/Stok";
 
 export default function Dashboard({ kullanici }) {
-  const [menu, setMenu] = useState("Dashboard");
+  const [menu, setMenu] = useState("Ana Sayfa");
 
   const yonetici = kullanici?.rol === "yonetici";
 
@@ -33,14 +33,14 @@ export default function Dashboard({ kullanici }) {
         <h2>SeKafe</h2>
 
         <button
-          onClick={() => setMenu("Dashboard")}
+          onClick={() => setMenu("Ana Sayfa")}
           style={{
             display: "block",
             width: "100%",
             marginBottom: 10,
           }}
         >
-          Dashboard
+          Ana Sayfa
         </button>
 
         <button
@@ -147,7 +147,7 @@ export default function Dashboard({ kullanici }) {
       </div>
 
       <div style={{ flex: 1, padding: 30 }}>
-        {menu === "Dashboard" && (
+        {menu === "Ana Sayfa" && (
   <div style={{ textAlign: "center", marginTop: 30 }}>
     <img
       src={logo}
